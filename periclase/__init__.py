@@ -47,6 +47,12 @@ class Server(BaseServer):
         # turn off throttling
         pass
 
+    async def handshake(self):
+        # 8 digit random number
+        alt_rand = str(randint(0, (10**8)-1)).zfill(8)
+        self.params.alt_nicknames = [f"p{alt_rand}"]
+        await super().handshake()
+
     def line_preread(self, line: Line):
         print(f"< {line.format()}")
 
