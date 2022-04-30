@@ -1,0 +1,26 @@
+server: irc.libera.chat:+6697
+nickname: periclase
+# optional
+#username: periclase
+# optional
+#realname: periclase
+password: periclase:hunter2
+log: "#libera-ctcps"
+audit: "#libera-ctcps"
+
+sasl:
+  username: periclase
+  password: hunter3
+
+oper:
+  name: periclase
+  file: ~/oper.key
+  pass: hunter4
+
+database:
+  user: periclase
+  name: periclase
+  # optional
+  #pass: hunter5
+  # optional
+  #host: 127.0.0.1
