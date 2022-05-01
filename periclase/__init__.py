@@ -91,13 +91,13 @@ class Server(BaseServer):
                     await self.send(build("CHALLENGE", [f"+{retort}"]))
                     break
 
-    async def _check_trigger(self, nuhr: str) -> Optional[int]:
+    async def _check_trigger(self, nuhr: str) -> Optional[Tuple[bool, int]]:
         for trigger_id, (pattern, action) in self._triggers.items():
             if not pattern.search(nuhr):
                 continue
             elif action == TriggerAction.IGNORE:
-                break
-            return trigger_id
+                return (False, trigger_id)
+            return (True, trigger_id)
         return None
 
     async def _check_reject(self, version: str) -> Optional[int]:
@@ -141,8 +141,12 @@ class Server(BaseServer):
 
             matched_trigger = await self._check_trigger(nuhr)
             if matched_trigger is not None:
-                await self._log(f"TRIGGER:{matched_trigger}: want to CTCP {nuhr}")
-                await self.send(build("PRIVMSG", [nickname, "\x01VERSION\x01"]))
+                trigger_scan, trigger_id = matched_trigger
+                if trigger_scan:
+                    await self._log(f"TRIGGER:SCAN: {trigger_id} {nuhr}")
+                    await self.send(build("PRIVMSG", [nickname, "\x01VERSION\x01"]))
+                else:
+                    await self._log(f"TRIGGER:IGNORE: {trigger_id} {nuhr}")
 
         elif (
             line.command == "NOTICE"
