@@ -20,10 +20,8 @@ from .database import Database, TriggerAction
 CAP_OPER = Capability(None, "solanum.chat/oper")
 CAP_REALHOST = Capability(None, "solanum.chat/realhost")
 
-OUR_CTCP = {
-    "VERSION": "periclase; CTCP VERSION scanner",
-    "SOURCE": "https://github.com/Libera-Chat/periclase",
-}
+URL = "https://github.com/Libera-Chat/periclase"
+OUR_CTCP = {"VERSION": f"periclase CTCP VERSION scanner ({URL})", "SOURCE": URL}
 
 RE_CLICONN = re_compile(
     r"^:[^!]+ NOTICE \* :\*{3} Notice -- Client connecting: (?P<nick>\S+) \((?P<userhost>[^)]+)\) \S+ \S+ \S+ \[(?P<real>.*)\]$"
