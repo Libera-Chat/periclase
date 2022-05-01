@@ -1,5 +1,6 @@
-import asyncio, ipaddress, time, traceback
+import asyncio, traceback
 from dataclasses import dataclass
+from random import randint
 from re import compile as re_compile
 from typing import Dict, Optional, Pattern, Tuple
 
@@ -51,7 +52,7 @@ class Server(BaseServer):
 
     async def handshake(self):
         # 8 digit random number
-        alt_rand = str(randint(0, (10**8)-1)).zfill(8)
+        alt_rand = str(randint(0, (10 ** 8) - 1)).zfill(8)
         self.params.alt_nicknames = [f"p{alt_rand}"]
         await super().handshake()
 
@@ -104,8 +105,6 @@ class Server(BaseServer):
             return None
 
     async def line_read(self, line: Line):
-        now = time.monotonic()
-
         if line.command == RPL_WELCOME:
             triggers = await self._database.trigger.list()
             for trigger_id, trigger_pattern in triggers:
