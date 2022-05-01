@@ -20,7 +20,10 @@ from .database import Database, TriggerAction
 CAP_OPER = Capability(None, "solanum.chat/oper")
 CAP_REALHOST = Capability(None, "solanum.chat/realhost")
 
-URL = "https://github.com/Libera-Chat/periclase"
+OUR_CTCP = {
+    "VERSION": "periclase; CTCP VERSION scanner",
+    "SOURCE": "https://github.com/Libera-Chat/periclase",
+}
 
 RE_CLICONN = re_compile(
     r"^:[^!]+ NOTICE \* :\*{3} Notice -- Client connecting: (?P<nick>\S+) \((?P<userhost>[^)]+)\) \S+ \S+ \S+ \[(?P<real>.*)\]$"
@@ -170,12 +173,22 @@ class Server(BaseServer):
             line.command == "PRIVMSG"
             and line.source is not None
             and self.is_me(line.params[0])
-            and line.params[1] == "\x01VERSION\x01"
+            and line.params[1].startswith("\x01")
+            and line.params[1].endswith("\x01")
         ):
-            # CTCP VERSION request
-            await self.send(
-                build("NOTICE", [line.hostmask.nickname, f"\x01VERSION {URL}\x01"])
-            )
+            # CTCP request
+            ctcp_type = line.params[1][1:-1].upper()
+            if ctcp_type in OUR_CTCP:
+                ctcp_response = OUR_CTCP[ctcp_type]
+                await self.send(
+                    build(
+                        "NOTICE",
+                        [
+                            line.hostmask.nickname,
+                            f"\x01{ctcp_type} {ctcp_response}\x01",
+                        ],
+                    )
+                )
 
         elif (
             line.command == "PRIVMSG"
