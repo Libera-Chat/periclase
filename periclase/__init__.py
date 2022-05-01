@@ -1,4 +1,5 @@
 import asyncio, traceback
+from collections import OrderedDict
 from dataclasses import dataclass
 from random import randint
 from re import compile as re_compile
@@ -14,7 +15,7 @@ from ircrobots.matching import ANY, Folded, Response, SELF
 from ircchallenge import Challenge
 
 from .config import Config
-from .database import Database
+from .database import Database, TriggerAction
 
 CAP_OPER = Capability(None, "solanum.chat/oper")
 CAP_REALHOST = Capability(None, "solanum.chat/realhost")
@@ -43,7 +44,7 @@ class Server(BaseServer):
         self.desired_caps.add(CAP_OPER)
         self.desired_caps.add(CAP_REALHOST)
 
-        self._triggers: Dict[int, Pattern] = {}
+        self._triggers: OrderedDict[int, Tuple[Pattern, TriggerAction]] = OrderedDict()
         self._rejects: Dict[int, Tuple[Pattern, str]] = {}
 
     def set_throttle(self, rate: int, time: float):
@@ -91,11 +92,13 @@ class Server(BaseServer):
                     break
 
     async def _check_trigger(self, nuhr: str) -> Optional[int]:
-        for trigger_id, pattern in self._triggers.items():
-            if pattern.search(nuhr):
-                return trigger_id
-        else:
-            return None
+        for trigger_id, (pattern, action) in self._triggers.items():
+            if not pattern.search(nuhr):
+                continue
+            elif action == TriggerAction.IGNORE:
+                break
+            return trigger_id
+        return None
 
     async def _check_reject(self, version: str) -> Optional[int]:
         for reject_id, (pattern, _) in self._rejects.items():
@@ -107,8 +110,15 @@ class Server(BaseServer):
     async def line_read(self, line: Line):
         if line.command == RPL_WELCOME:
             triggers = await self._database.trigger.list()
-            for trigger_id, trigger_pattern in triggers:
-                self._triggers[trigger_id] = re_compile(trigger_pattern)
+            for trigger_id, trigger_pattern, trigger_action in triggers:
+                self._triggers[trigger_id] = (
+                    re_compile(trigger_pattern),
+                    trigger_action,
+                )
+            # sort by action, so IGNORE comes first
+            self._triggers = OrderedDict(
+                sorted(self._triggers.items(), key=lambda a: a[1][1])
+            )
 
             rejects = await self._database.reject.list()
             for reject_id, reject_pattern, reject_reason in rejects:

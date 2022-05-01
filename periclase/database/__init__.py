@@ -1,7 +1,7 @@
 import asyncpg
 from typing import Optional
 
-from .db_trigger import TriggerTable
+from .db_trigger import TriggerTable, TriggerAction
 from .db_reject import RejectTable
 
 

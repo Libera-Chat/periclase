@@ -13,6 +13,7 @@ CREATE TABLE trigger (
     pattern  TEXT         NOT NULL,
     oper     VARCHAR(16)  NOT NULL,
     source   VARCHAR(92)  NOT NULL,
+    action   SMALLINT     NOT NULL,
     ts       TIMESTAMP    NOT NULL
 );
 CREATE TABLE reject (
