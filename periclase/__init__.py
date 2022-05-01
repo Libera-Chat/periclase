@@ -91,13 +91,11 @@ class Server(BaseServer):
                     await self.send(build("CHALLENGE", [f"+{retort}"]))
                     break
 
-    async def _check_trigger(self, nuhr: str) -> Optional[Tuple[bool, int]]:
+    async def _check_trigger(self, nuhr: str) -> Optional[Tuple[int, TriggerAction]]:
         for trigger_id, (pattern, action) in self._triggers.items():
             if not pattern.search(nuhr):
                 continue
-            elif action == TriggerAction.IGNORE:
-                return (False, trigger_id)
-            return (True, trigger_id)
+            return (trigger_id, action)
         return None
 
     async def _check_reject(self, version: str) -> Optional[int]:
@@ -141,12 +139,12 @@ class Server(BaseServer):
 
             matched_trigger = await self._check_trigger(nuhr)
             if matched_trigger is not None:
-                trigger_scan, trigger_id = matched_trigger
-                if trigger_scan:
-                    await self._log(f"TRIGGER:SCAN: {trigger_id} {nuhr}")
+                trigger_id, trigger_action = matched_trigger
+                await self._log(
+                    f"TRIGGER:{trigger_action.name.upper()}: {trigger_id} {nuhr}"
+                )
+                if trigger_action == TriggerAction.SCAN:
                     await self.send(build("PRIVMSG", [nickname, "\x01VERSION\x01"]))
-                else:
-                    await self._log(f"TRIGGER:IGNORE: {trigger_id} {nuhr}")
 
         elif (
             line.command == "NOTICE"
