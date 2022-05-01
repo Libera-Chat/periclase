@@ -161,7 +161,9 @@ class Server(BaseServer):
             if matched_reject is not None:
                 # GET THEY ASS
                 _, reason = self._rejects[matched_reject]
-                await self._log(f"BAD: {line.source} for CTCP reject {matched_reject}")
+                await self._log(
+                    f"BAD: {matched_reject} {line.hostmask.nickname} {version}"
+                )
                 await self.send(build("KLINE", ["10", f"*@{ip}", reason]))
 
         elif (
