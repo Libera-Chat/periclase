@@ -18,6 +18,8 @@ from .database import Database
 CAP_OPER = Capability(None, "solanum.chat/oper")
 CAP_REALHOST = Capability(None, "solanum.chat/realhost")
 
+URL = "https://github.com/Libera-Chat/periclase"
+
 RE_CLICONN = re_compile(
     r"^:[^!]+ NOTICE \* :\*{3} Notice -- Client connecting: (?P<nick>\S+) \((?P<userhost>[^)]+)\) \S+ \S+ \S+ \[(?P<real>.*)\]$"
 )
@@ -141,6 +143,7 @@ class Server(BaseServer):
             and line.tags is not None
             and not (ip := line.tags.get("solanum.chat/ip", "")) == ""
         ):
+            # CTCP VERSION response
             version = p_version.group("version")
 
             matched_reject = await self._check_reject(version)
@@ -149,6 +152,17 @@ class Server(BaseServer):
                 _, reason = self._rejects[matched_reject]
                 await self._log(f"BAD: {line.source} for CTCP reject {matched_reject}")
                 await self.send(build("KLINE", ["10", f"*@{ip}", reason]))
+
+        elif (
+            line.command == "PRIVMSG"
+            and line.source is not None
+            and self.is_me(line.params[0])
+            and line.params[1] == "\x01VERSION\x01"
+        ):
+            # CTCP VERSION request
+            await self.send(
+                build("NOTICE", [line.hostmask.nickname, f"\x01VERSION {URL}\x01"])
+            )
 
         elif (
             line.command == "PRIVMSG"
