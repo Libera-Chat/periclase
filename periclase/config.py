@@ -16,6 +16,7 @@ class Config(object):
 
     log: str
     audit: str
+    notify: str
 
     sasl: Tuple[str, str]
     oper: Tuple[str, str, str]
@@ -44,6 +45,7 @@ def load(filepath: str):
         config_yaml["password"],
         config_yaml["log"],
         config_yaml["audit"],
+        config_yaml["notify"],
         (config_yaml["sasl"]["username"], config_yaml["sasl"]["password"]),
         (oper_name, oper_file, oper_pass),
         config_yaml["database"]["user"],

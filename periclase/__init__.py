@@ -145,6 +145,8 @@ class Server(BaseServer):
                     f"TRIGGER:{trigger_action.name.upper()}: {trigger_id} {nuhr}"
                 )
                 if trigger_action == TriggerAction.SCAN:
+                    await self.send(build("NOTICE", [nickname, self._config.notify]))
+                if trigger_action in {TriggerAction.SCAN, TriggerAction.QUIETSCAN}:
                     await self.send(build("PRIVMSG", [nickname, "\x01VERSION\x01"]))
 
         elif (

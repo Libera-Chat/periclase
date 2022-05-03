@@ -6,6 +6,7 @@ from .common import Table
 class TriggerAction(IntEnum):
     IGNORE = 1
     SCAN = 2
+    QUIETSCAN = 3
 
 
 class TriggerTable(Table):
