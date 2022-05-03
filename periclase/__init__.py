@@ -166,6 +166,8 @@ class Server(BaseServer):
                     f"BAD: {matched_reject} {line.hostmask.nickname} {version}"
                 )
                 await self.send(build("KLINE", ["10", f"*@{ip}", reason]))
+            else:
+                await self._log(f"FINE: {line.hostmask.nickname} {version}")
 
         elif (
             line.command == "PRIVMSG"
