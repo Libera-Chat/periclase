@@ -123,7 +123,6 @@ class Server(BaseServer):
             for reject_id, reject_pattern, reject_reason in rejects:
                 self._rejects[reject_id] = (re_compile(reject_pattern), reject_reason)
 
-            await self.send(build("MODE", [self.nickname, "+g"]))
             oper_name, oper_file, oper_pass = self._config.oper
             await self._oper_up(oper_name, oper_file, oper_pass)
 
