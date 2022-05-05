@@ -23,9 +23,6 @@ CAP_REALHOST = Capability(None, "solanum.chat/realhost")
 URL = "https://github.com/Libera-Chat/periclase"
 OUR_CTCP = {"VERSION": f"periclase CTCP VERSION scanner ({URL})", "SOURCE": URL}
 
-RE_CLICONN = re_compile(
-    r"^:[^!]+ NOTICE \* :\*{3} Notice -- Client connecting: (?P<nick>\S+) \((?P<userhost>[^)]+)\) \S+ \S+ \S+ \[(?P<real>.*)\]$"
-)
 RE_VERSION = re_compile(r"^\x01VERSION (?P<version>.*?)\x01?$")
 RE_NUHR = re_compile(r"^(?P<nick>[^!]+)![^@]+@\S+ .+$")
 
@@ -132,7 +129,7 @@ class Server(BaseServer):
             # c near cliconn
             await self.send(build("MODE", [self.nickname, "-s+s", "+Fc"]))
 
-        elif p_cliconn := RE_CLICONN.search(line.format()):
+        elif p_cliconn := self._config.cliconn.search(line.format()):
             nickname = p_cliconn.group("nick")
             userhost = p_cliconn.group("userhost")
             realname = p_cliconn.group("real")

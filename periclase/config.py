@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from os.path import expanduser
 from re import compile as re_compile
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Pattern, Sequence, Tuple
 
 import yaml
 
@@ -16,6 +16,7 @@ class Config(object):
 
     log: str
     audit: str
+    cliconn: Pattern
     notify: str
 
     sasl: Tuple[str, str]
@@ -45,6 +46,7 @@ def load(filepath: str):
         config_yaml["password"],
         config_yaml["log"],
         config_yaml["audit"],
+        re_compile(config_yaml["cliconn"]),
         config_yaml["notify"],
         (config_yaml["sasl"]["username"], config_yaml["sasl"]["password"]),
         (oper_name, oper_file, oper_pass),

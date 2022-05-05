@@ -7,6 +7,8 @@ nickname: periclase
 password: periclase:hunter2
 log: "#libera-ctcps"
 audit: "#libera-ctcps"
+
+cliconn: '^:[^!]+ NOTICE \* :\*{3} Notice -- Client connecting: (?P<nick>\S+) \((?P<userhost>[^)]+)\) \S+ \S+ \S+ \[(?P<real>.*)\]$'
 notify: "Welcome to Libera Chat. To protect you and the network, we've asked your client to let us know what version it is. If you are running a version known to have vulnerabilities, you will be notified and disconnected."
 
 sasl:
