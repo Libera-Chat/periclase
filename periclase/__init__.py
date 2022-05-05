@@ -196,20 +196,34 @@ class Server(BaseServer):
             line.command == "PRIVMSG"
             and line.source is not None
             and not self.is_me(line.hostmask.nickname)
+            and self.is_me(line.params[0])
         ):
+            # private message
+            await self._audit(f"[PV] <{line.source}> {line.params[1]}")
+            cmd, _, args = line.params[1].partition(" ")
+            await self.cmd(
+                line.hostmask, line.hostmask.nickname, cmd.lower(), args, line.tags
+            )
 
-            me = self.nickname
-            who = line.hostmask
-
+        elif (
+            line.command == "PRIVMSG"
+            and line.source is not None
+            and not self.is_me(line.hostmask.nickname)
+            and self.is_channel(line.params[0])
+        ):
+            # channel message
             first, _, rest = line.params[1].partition(" ")
-            if self.is_me(line.params[0]):
-                # private message
-                await self._audit(f"[PV] <{line.source}> {line.params[1]}")
-                await self.cmd(who, first.lower(), rest, line.tags)
+            if first in {f"{self.nickname}{c}" for c in [":", ",", ""]} and rest:
+                # highlight
+                cmd, _, args = rest.partition(" ")
+                await self.cmd(
+                    line.hostmask, line.params[0], cmd.lower(), args, line.tags
+                )
 
     async def cmd(
         self,
         who: Hostmask,
+        target: str,
         command: str,
         args: str,
         tags: Optional[Dict[str, str]],
@@ -221,7 +235,7 @@ class Server(BaseServer):
             if hasattr(self, attrib):
                 outs = await getattr(self, attrib)(caller, args)
                 for out in outs:
-                    await self.send(build("NOTICE", [who.nickname, out]))
+                    await self.send(build("NOTICE", [target, out]))
 
     async def cmd_scan(self, caller: Caller, sargs: str):
         nuhr = RE_NUHR.search(sargs)
