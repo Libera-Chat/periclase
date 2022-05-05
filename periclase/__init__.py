@@ -27,6 +27,7 @@ RE_CLICONN = re_compile(
     r"^:[^!]+ NOTICE \* :\*{3} Notice -- Client connecting: (?P<nick>\S+) \((?P<userhost>[^)]+)\) \S+ \S+ \S+ \[(?P<real>.*)\]$"
 )
 RE_VERSION = re_compile(r"^\x01VERSION (?P<version>.*?)\x01?$")
+RE_NUHR = re_compile(r"^(?P<nick>[^!]+)![^@]+@\S+ .+$")
 
 
 @dataclass
@@ -221,6 +222,20 @@ class Server(BaseServer):
                 outs = await getattr(self, attrib)(caller, args)
                 for out in outs:
                     await self.send(build("NOTICE", [who.nickname, out]))
+
+    async def cmd_scan(self, caller: Caller, sargs: str):
+        nuhr = RE_NUHR.search(sargs)
+        if nuhr is None:
+            return ["please provide `nickname!username@hostname realname`"]
+
+        matched_trigger = await self._check_trigger(sargs)
+        if matched_trigger is None:
+            return ["no trigger matched"]
+
+        trigger_id, trigger_action = matched_trigger
+        await self._log(f"TRIGGER:{trigger_action.name.upper()}: {trigger_id} {sargs}")
+        await self.send(build("PRIVMSG", [nuhr.group("nick"), "\x01VERSION\x01"]))
+        return []
 
 
 class Bot(BaseBot):
