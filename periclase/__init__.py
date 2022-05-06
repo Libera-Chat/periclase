@@ -146,9 +146,7 @@ class Server(BaseServer):
             matched_trigger = await self._check_trigger(nuhr)
             if matched_trigger is not None:
                 trigger_id, trigger_action = matched_trigger
-                await self._log(
-                    f"TRIGGER:{trigger_action.name}: {trigger_id} {nuhr}"
-                )
+                await self._log(f"TRIGGER:{trigger_action.name}: {trigger_id} {nuhr}")
                 if trigger_action == TriggerAction.SCAN:
                     await self.send(build("NOTICE", [nickname, self._config.notify]))
                 if trigger_action in {TriggerAction.SCAN, TriggerAction.QUIETSCAN}:

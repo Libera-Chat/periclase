@@ -43,7 +43,9 @@ class TriggerTable(Table):
         """
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(query, trigger_id)
-        return Trigger(*row)
+
+        pattern, source, oper, action, ts = row
+        return Trigger(pattern, source, oper, TriggerAction(action), ts)
 
     async def add(self, pattern: str, source: str, oper: str) -> int:
         query = """
