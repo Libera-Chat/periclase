@@ -1,5 +1,5 @@
 import re
-from typing import Pattern
+from typing import Pattern, Tuple
 
 
 def _find_unescaped(s: str, c: int) -> int:
@@ -15,16 +15,23 @@ def _find_unescaped(s: str, c: int) -> int:
         return -1
 
 
-def compile_pattern(pattern: str) -> Pattern:
-    pattern_delim = pattern[0]
-    if pattern_delim.isalnum():
+def lex_pattern(pattern: str) -> Tuple[int, str, str, str]:
+    pattern_delim_ = pattern[0]
+    if pattern_delim_.isalnum():
         raise ValueError("pattern delimiter cannot be alphanumeric")
+    pattern_delim = ord(pattern_delim_)
 
-    regex_end = _find_unescaped(pattern, ord(pattern_delim))
+    regex_end = _find_unescaped(pattern, pattern_delim)
     if regex_end == -1:
         raise ValueError("unterminated regex")
 
     regex, pattern_flags = pattern[1 : regex_end - 1], pattern[regex_end:]
+    pattern_flags, _, remaining = pattern_flags.partition(" ")
+    return (pattern_delim, regex, pattern_flags, remaining)
+
+
+def compile_pattern(pattern: str) -> Pattern:
+    _1, regex, pattern_flags, _2 = lex_pattern(pattern)
 
     regex_flags = 0
     for pattern_flag in pattern_flags:

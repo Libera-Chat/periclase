@@ -31,6 +31,16 @@ class TriggerTable(Table):
             rows = await conn.fetch(query)
         return [(id, Trigger(*row)) for id, *row in rows]
 
+    async def get(self, trigger_id) -> Trigger:
+        query = """
+            SELECT pattern, source, oper, action, ts
+            FROM trigger
+            WHERE id = $1
+        """
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(query, trigger_id)
+        return Trigger(*row)
+
     async def add(self, pattern: str, source: str, oper: str) -> int:
         query = """
             INSERT INTO trigger (pattern, source, oper, action, ts)

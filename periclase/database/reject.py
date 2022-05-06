@@ -24,6 +24,16 @@ class RejectTable(Table):
             rows = await conn.fetch(query)
         return [(id, Reject(*row)) for id, *row in rows]
 
+    async def get(self, reject_id: int) -> Reject:
+        query = """
+            SELECT pattern, source, oper, reason, ts
+            FROM reject
+            WHERE id = $1
+        """
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(query, reject_id)
+        return Reject(*row)
+
     async def add(self, pattern: str, source: str, oper: str, reason: str):
         query = """
             INSERT INTO reject (pattern, source, oper, reason, ts)

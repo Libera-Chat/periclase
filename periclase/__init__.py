@@ -23,7 +23,7 @@ from .config import Config
 from .database import Database
 from .database.reject import Reject
 from .database.trigger import Trigger, TriggerAction
-from .utils import compile_pattern
+from .utils import compile_pattern, lex_pattern
 
 CAP_OPER = Capability(None, "solanum.chat/oper")
 CAP_REALHOST = Capability(None, "solanum.chat/realhost")
@@ -234,13 +234,21 @@ class Server(BaseServer):
         tags: Optional[Dict[str, str]],
     ):
 
-        if tags and (oper := tags.get("solanum.chat/oper", "")):
-            caller = Caller(who.nickname, str(who), oper)
-            attrib = f"cmd_{command}"
-            if hasattr(self, attrib):
-                outs = await getattr(self, attrib)(caller, args)
-                for out in outs:
-                    await self.send(build("NOTICE", [target, out]))
+        if not tags or not (oper := tags.get("solanum.chat/oper", "")):
+            return
+
+        caller = Caller(who.nickname, str(who), oper)
+        attrib = f"cmd_{command}"
+        if not hasattr(self, attrib):
+            return
+
+        try:
+            outs = await getattr(self, attrib)(caller, args)
+        except ValueError as e:
+            outs = [f"error: {str(e)}"]
+
+        for out in outs:
+            await self.send(build("NOTICE", [target, out]))
 
     async def cmd_scan(self, caller: Caller, sargs: str):
         nuhr = RE_NUHR.search(sargs)
@@ -257,10 +265,57 @@ class Server(BaseServer):
         return []
 
     async def _cmd_reject_add(self, caller: Caller, sargs: str) -> Sequence[str]:
-        return []
+        if sargs.strip() == "":
+            return ["please provide a reject pattern and reason"]
+
+        p_delim, pattern, p_flags, reason = lex_pattern(sargs)
+
+        if reason.strip() == "":
+            return ["please provide a reject reason"]
+
+        # TODO: kinda strange that we totally re-create the pattern
+        pattern = f"{chr(p_delim)}{pattern}{chr(p_delim)}{p_flags}"
+        reject_id = await self._database.reject.add(
+            pattern, caller.source, caller.oper, reason
+        )
+        self._rejects[reject_id] = (
+            compile_pattern(pattern),
+            await self._database.reject.get(reject_id),
+        )
+
+        return [f"added reject {reject_id}"]
+
+    async def _cmd_reject_get(self, caller: Caller, sargs: str) -> Sequence[str]:
+        if sargs.strip() == "":
+            return ["please provide a reject id"]
+        elif not sargs.isdigit():
+            return [f"'{sargs}' is not a valid reject id"]
+
+        reject_id = int(sargs)
+        if not reject_id in self._rejects:
+            return ["unknown reject id"]
+
+        _, reject = self._rejects[reject_id]
+        return [
+            reject.pattern,
+            f"reason: {reject.reason}",
+            f" since: {reject.ts.isoformat()}",
+            f" adder: {reject.oper} ({reject.source})",
+        ]
 
     async def _cmd_reject_remove(self, caller: Caller, sargs: str) -> Sequence[str]:
-        return []
+        if sargs.strip() == "":
+            return ["please provide a reject id"]
+        elif not sargs.isdigit():
+            return [f"'{sargs}' is not a valid reject id"]
+
+        reject_id = int(sargs)
+        if not reject_id in self._rejects:
+            return ["unknown reject id"]
+
+        _, reject = self._rejects.pop(reject_id)
+        await self._database.reject.remove(reject_id)
+        return [f"removed reject {reject_id} ({reject.pattern})"]
 
     async def _cmd_reject_list(self, caller: Caller, sargs: str) -> Sequence[str]:
         if not self._rejects:
@@ -279,8 +334,94 @@ class Server(BaseServer):
     async def cmd_reject(self, caller: Caller, sargs: str) -> Sequence[str]:
         subcmds: Dict[str, Callable[[Caller, str], Awaitable[Sequence[str]]]] = {
             "ADD": self._cmd_reject_add,
+            "GET": self._cmd_reject_get,
             "REMOVE": self._cmd_reject_remove,
             "LIST": self._cmd_reject_list,
+        }
+        subcmd_keys = ", ".join(subcmds.keys())
+
+        subcmd, _, sargs = sargs.partition(" ")
+        if subcmd == "":
+            return [f"please provide a subcommand ({subcmd_keys})"]
+
+        subcmd = subcmd.upper()
+        if not subcmd in subcmds:
+            return [f"unknown subcommand '{subcmd}', expectected {subcmd_keys}"]
+
+        subcmd_func = subcmds[subcmd]
+        return await subcmd_func(caller, sargs)
+
+    async def _cmd_trigger_add(self, caller: Caller, sargs: str) -> Sequence[str]:
+        if (sargs := sargs.strip()) == "":
+            return ["please provide a trigger pattern"]
+
+        p_delim, pattern, p_flags, _ = lex_pattern(sargs)
+
+        # TODO: kinda strange that we totally re-create the pattern
+        pattern = f"{chr(p_delim)}{pattern}{chr(p_delim)}{p_flags}"
+        trigger_id = await self._database.trigger.add(
+            pattern, caller.source, caller.oper
+        )
+        self._triggers[trigger_id] = (
+            compile_pattern(pattern),
+            await self._database.trigger.get(trigger_id),
+        )
+
+        return [f"added trigger {trigger_id}"]
+
+    async def _cmd_trigger_get(self, caller: Caller, sargs: str) -> Sequence[str]:
+        if sargs.strip() == "":
+            return ["please provide a trigger id"]
+        elif not sargs.isdigit():
+            return [f"'{sargs}' is not a valid trigger id"]
+
+        trigger_id = int(sargs)
+        if not trigger_id in self._triggers:
+            return ["unknown trigger id"]
+
+        _, trigger = self._triggers[trigger_id]
+        return [
+            trigger.pattern,
+            f"since: {trigger.ts.isoformat()}",
+            f"adder: {trigger.oper} ({trigger.source})",
+        ]
+
+    async def _cmd_trigger_remove(self, caller: Caller, sargs: str) -> Sequence[str]:
+        if (sargs := sargs.strip()) == "":
+            return ["please provide a trigger id"]
+        elif not sargs.isdigit():
+            return [f"'{sargs}' is not a valid trigger id"]
+
+        trigger_id = int(sargs)
+        if not trigger_id in self._triggers:
+            return ["unknown trigger id"]
+
+        _, trigger = self._triggers.pop(trigger_id)
+        await self._database.trigger.remove(trigger_id)
+        return [f"removed trigger {trigger_id} ({trigger.pattern})"]
+
+    # TODO: this is a lot of code duplication. what can we do about that?
+    async def _cmd_trigger_list(self, caller: Caller, sargs: str) -> Sequence[str]:
+        if not self._triggers:
+            return ["no triggers"]
+
+        output: List[str] = []
+
+        col_max = max(len(str(trigger_id)) for trigger_id in self._triggers.keys())
+        for trigger_id, (_, trigger) in self._triggers.items():
+            trigger_id_s = str(trigger_id).rjust(col_max)
+            output.append(f"{trigger_id_s}: {trigger.pattern}")
+
+        output.append(f"({len(output)} total)")
+        return output
+
+    # TODO: this is a lot of code duplication. what can we do about that?
+    async def cmd_trigger(self, caller: Caller, sargs: str) -> Sequence[str]:
+        subcmds: Dict[str, Callable[[Caller, str], Awaitable[Sequence[str]]]] = {
+            "ADD": self._cmd_trigger_add,
+            "GET": self._cmd_trigger_get,
+            "REMOVE": self._cmd_trigger_remove,
+            "LIST": self._cmd_trigger_list,
         }
         subcmd_keys = ", ".join(subcmds.keys())
 
