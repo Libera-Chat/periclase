@@ -1,21 +1,29 @@
-import asyncio, traceback
+import traceback
 from collections import OrderedDict
 from dataclasses import dataclass
 from random import randint
 from re import compile as re_compile
-from typing import Dict, Optional, Pattern, Tuple
+from typing import Awaitable, Callable, Dict, List, Optional, Pattern, Sequence, Tuple
 
 from irctokens import build, Hostmask, Line
 from ircrobots import Bot as BaseBot
 from ircrobots import Server as BaseServer
 
-from ircstates.numerics import *
+from ircstates.numerics import (
+    RPL_WELCOME,
+    RPL_YOUREOPER,
+    RPL_RSACHALLENGE2,
+    RPL_ENDOFRSACHALLENGE2,
+)
 from ircrobots.ircv3 import Capability
-from ircrobots.matching import ANY, Folded, Response, SELF
+from ircrobots.matching import ANY, Response, SELF
 from ircchallenge import Challenge
 
 from .config import Config
-from .database import Database, TriggerAction
+from .database import Database
+from .database.reject import Reject
+from .database.trigger import Trigger, TriggerAction
+from .utils import compile_pattern
 
 CAP_OPER = Capability(None, "solanum.chat/oper")
 CAP_REALHOST = Capability(None, "solanum.chat/realhost")
@@ -43,8 +51,8 @@ class Server(BaseServer):
         self.desired_caps.add(CAP_OPER)
         self.desired_caps.add(CAP_REALHOST)
 
-        self._triggers: OrderedDict[int, Tuple[Pattern, TriggerAction]] = OrderedDict()
-        self._rejects: Dict[int, Tuple[Pattern, str]] = {}
+        self._triggers: OrderedDict[int, Tuple[Pattern, Trigger]] = OrderedDict()
+        self._rejects: OrderedDict[int, Tuple[Pattern, Reject]] = OrderedDict()
 
     def set_throttle(self, rate: int, time: float):
         # turn off throttling
@@ -91,15 +99,15 @@ class Server(BaseServer):
                     break
 
     async def _check_trigger(self, nuhr: str) -> Optional[Tuple[int, TriggerAction]]:
-        for trigger_id, (pattern, action) in self._triggers.items():
-            if not pattern.search(nuhr):
+        for trigger_id, (trigger_pattern, trigger) in self._triggers.items():
+            if not trigger_pattern.search(nuhr):
                 continue
-            return (trigger_id, action)
+            return (trigger_id, trigger.action)
         return None
 
     async def _check_reject(self, version: str) -> Optional[int]:
-        for reject_id, (pattern, _) in self._rejects.items():
-            if pattern.search(version):
+        for reject_id, (reject_pattern, _) in self._rejects.items():
+            if reject_pattern.search(version):
                 return reject_id
         else:
             return None
@@ -107,19 +115,19 @@ class Server(BaseServer):
     async def line_read(self, line: Line):
         if line.command == RPL_WELCOME:
             triggers = await self._database.trigger.list()
-            for trigger_id, trigger_pattern, trigger_action in triggers:
+            for trigger_id, trigger in triggers:
                 self._triggers[trigger_id] = (
-                    re_compile(trigger_pattern),
-                    trigger_action,
+                    compile_pattern(trigger.pattern),
+                    trigger,
                 )
             # sort by action, so IGNORE comes first
             self._triggers = OrderedDict(
-                sorted(self._triggers.items(), key=lambda a: a[1][1])
+                sorted(self._triggers.items(), key=lambda a: a[1][1].action)
             )
 
             rejects = await self._database.reject.list()
-            for reject_id, reject_pattern, reject_reason in rejects:
-                self._rejects[reject_id] = (re_compile(reject_pattern), reject_reason)
+            for reject_id, reject in rejects:
+                self._rejects[reject_id] = (compile_pattern(reject.pattern), reject)
 
             oper_name, oper_file, oper_pass = self._config.oper
             await self._oper_up(oper_name, oper_file, oper_pass)
@@ -160,11 +168,11 @@ class Server(BaseServer):
             matched_reject = await self._check_reject(version)
             if matched_reject is not None:
                 # GET THEY ASS
-                _, reason = self._rejects[matched_reject]
+                _, reject = self._rejects[matched_reject]
                 await self._log(
                     f"BAD: {matched_reject} {line.hostmask.nickname} {version}"
                 )
-                await self.send(build("KLINE", ["10", f"*@{ip}", reason]))
+                await self.send(build("KLINE", ["10", f"*@{ip}", reject.reason]))
             else:
                 await self._log(f"FINE: {line.hostmask.nickname} {version}")
 
@@ -247,6 +255,45 @@ class Server(BaseServer):
         await self._log(f"TRIGGER:{trigger_action.name.upper()}: {trigger_id} {sargs}")
         await self.send(build("PRIVMSG", [nuhr.group("nick"), "\x01VERSION\x01"]))
         return []
+
+    async def _cmd_reject_add(self, caller: Caller, sargs: str) -> Sequence[str]:
+        return []
+
+    async def _cmd_reject_remove(self, caller: Caller, sargs: str) -> Sequence[str]:
+        return []
+
+    async def _cmd_reject_list(self, caller: Caller, sargs: str) -> Sequence[str]:
+        if not self._rejects:
+            return ["no rejects"]
+
+        output: List[str] = []
+
+        col_max = max(len(str(reject_id)) for reject_id in self._rejects.keys())
+        for reject_id, (_, reject) in self._rejects.items():
+            reject_id_s = str(reject_id).rjust(col_max)
+            output.append(f"{reject_id_s}: {reject.pattern}")
+
+        output.append(f"({len(output)} total)")
+        return output
+
+    async def cmd_reject(self, caller: Caller, sargs: str) -> Sequence[str]:
+        subcmds: Dict[str, Callable[[Caller, str], Awaitable[Sequence[str]]]] = {
+            "ADD": self._cmd_reject_add,
+            "REMOVE": self._cmd_reject_remove,
+            "LIST": self._cmd_reject_list,
+        }
+        subcmd_keys = ", ".join(subcmds.keys())
+
+        subcmd, _, sargs = sargs.partition(" ")
+        if subcmd == "":
+            return [f"please provide a subcommand ({subcmd_keys})"]
+
+        subcmd = subcmd.upper()
+        if not subcmd in subcmds:
+            return [f"unknown subcommand '{subcmd}', expectected {subcmd_keys}"]
+
+        subcmd_func = subcmds[subcmd]
+        return await subcmd_func(caller, sargs)
 
 
 class Bot(BaseBot):

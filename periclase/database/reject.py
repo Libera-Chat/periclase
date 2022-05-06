@@ -1,31 +1,42 @@
+from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Tuple
 from .common import Table
 
 
+@dataclass
+class Reject:
+    pattern: str
+    source: str
+    oper: str
+    reason: str
+    ts: datetime
+
+
 class RejectTable(Table):
-    async def list(self) -> List[Tuple[int, str, str]]:
+    async def list(self) -> List[Tuple[int, Reject]]:
         query = """
-            SELECT id, pattern, reason
+            SELECT id, pattern, source, oper, reason, ts
             FROM reject
         """
 
         async with self.pool.acquire() as conn:
-            return await conn.fetch(query)
+            rows = await conn.fetch(query)
+        return [(id, Reject(*row)) for id, *row in rows]
 
     async def add(self, pattern: str, source: str, oper: str, reason: str):
         query = """
-            INSERT INTO reject (pattern, source, oper, reason, enabled, ts)
-            VALUES ($1, $2, $3, $4, true, NOW()::TIMESTAMP)
+            INSERT INTO reject (pattern, source, oper, reason, ts)
+            VALUES ($1, $2, $3, $4, NOW()::TIMESTAMP)
             RETURNING id
         """
 
         async with self.pool.acquire() as conn:
             return await conn.fetchval(query, pattern, source, oper, reason)
 
-    async def disable(self, reject_id: int) -> None:
+    async def remove(self, reject_id: int) -> None:
         query = """
-            UPDATE reject
-            SET enabled = false
+            DELETE FROM reject
             WHERE id = $1
         """
 
