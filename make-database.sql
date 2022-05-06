@@ -22,7 +22,6 @@ CREATE TABLE reject (
     oper     VARCHAR(16)   NOT NULL,
     source   VARCHAR(92)   NOT NULL,
     reason   VARCHAR(260)  NOT NULL,
-    enabled  BOOLEAN       NOT NULL,
     ts       TIMESTAMP     NOT NULL
 );
 
