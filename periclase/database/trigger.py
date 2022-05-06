@@ -29,7 +29,11 @@ class TriggerTable(Table):
 
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(query)
-        return [(id, Trigger(*row)) for id, *row in rows]
+
+        out: List[Tuple[int, Trigger]] = []
+        for id, pattern, source, oper, action, ts in rows:
+            out.append((id, Trigger(pattern, source, oper, TriggerAction(action), ts)))
+        return out
 
     async def get(self, trigger_id) -> Trigger:
         query = """

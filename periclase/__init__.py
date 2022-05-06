@@ -147,7 +147,7 @@ class Server(BaseServer):
             if matched_trigger is not None:
                 trigger_id, trigger_action = matched_trigger
                 await self._log(
-                    f"TRIGGER:{trigger_action.name.upper()}: {trigger_id} {nuhr}"
+                    f"TRIGGER:{trigger_action.name}: {trigger_id} {nuhr}"
                 )
                 if trigger_action == TriggerAction.SCAN:
                     await self.send(build("NOTICE", [nickname, self._config.notify]))
@@ -260,7 +260,7 @@ class Server(BaseServer):
             return ["no trigger matched"]
 
         trigger_id, trigger_action = matched_trigger
-        await self._log(f"TRIGGER:{trigger_action.name.upper()}: {trigger_id} {sargs}")
+        await self._log(f"TRIGGER:{trigger_action.name}: {trigger_id} {sargs}")
         await self.send(build("PRIVMSG", [nuhr.group("nick"), "\x01VERSION\x01"]))
         return []
 
@@ -382,8 +382,9 @@ class Server(BaseServer):
         _, trigger = self._triggers[trigger_id]
         return [
             trigger.pattern,
-            f"since: {trigger.ts.isoformat()}",
-            f"adder: {trigger.oper} ({trigger.source})",
+            f"action: {trigger.action.name}",
+            f" since: {trigger.ts.isoformat()}",
+            f" adder: {trigger.oper} ({trigger.source})",
         ]
 
     async def _cmd_trigger_remove(self, caller: Caller, sargs: str) -> Sequence[str]:
