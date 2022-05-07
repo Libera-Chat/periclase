@@ -98,7 +98,7 @@ class Server(BaseServer):
                     await self.send(build("CHALLENGE", [f"+{retort}"]))
                     break
 
-    async def _sort_triggers(self) -> None:
+    def _sort_triggers(self) -> None:
         # sort by action; DISABLED, IGNORE, QUIETSCAN, SCAN
         self._triggers = OrderedDict(
             sorted(self._triggers.items(), key=lambda a: a[1][1].action)
