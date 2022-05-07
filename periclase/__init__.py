@@ -100,7 +100,9 @@ class Server(BaseServer):
 
     async def _check_trigger(self, nuhr: str) -> Optional[Tuple[int, TriggerAction]]:
         for trigger_id, (trigger_pattern, trigger) in self._triggers.items():
-            if not trigger_pattern.search(nuhr):
+            if trigger.action == TriggerAction.DISABLED or not trigger_pattern.search(
+                nuhr
+            ):
                 continue
             return (trigger_id, trigger.action)
         return None
