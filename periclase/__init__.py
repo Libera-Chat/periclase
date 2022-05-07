@@ -98,7 +98,13 @@ class Server(BaseServer):
                     await self.send(build("CHALLENGE", [f"+{retort}"]))
                     break
 
-    async def _check_trigger(self, nuhr: str) -> Optional[Tuple[int, TriggerAction]]:
+    async def _sort_triggers(self) -> None:
+        # sort by action; DISABLED, IGNORE, QUIETSCAN, SCAN
+        self._triggers = OrderedDict(
+            sorted(self._triggers.items(), key=lambda a: a[1][1].action)
+        )
+
+    async def _check_triggers(self, nuhr: str) -> Optional[Tuple[int, TriggerAction]]:
         for trigger_id, (trigger_pattern, trigger) in self._triggers.items():
             if trigger.action == TriggerAction.DISABLED or not trigger_pattern.search(
                 nuhr
@@ -107,7 +113,7 @@ class Server(BaseServer):
             return (trigger_id, trigger.action)
         return None
 
-    async def _check_reject(self, version: str) -> Optional[int]:
+    async def _check_rejects(self, version: str) -> Optional[int]:
         for reject_id, (reject_pattern, _) in self._rejects.items():
             if reject_pattern.search(version):
                 return reject_id
@@ -122,10 +128,7 @@ class Server(BaseServer):
                     compile_pattern(trigger.pattern),
                     trigger,
                 )
-            # sort by action, so IGNORE comes first
-            self._triggers = OrderedDict(
-                sorted(self._triggers.items(), key=lambda a: a[1][1].action)
-            )
+            self._sort_triggers()
 
             rejects = await self._database.reject.list()
             for reject_id, reject in rejects:
@@ -145,7 +148,7 @@ class Server(BaseServer):
             realname = p_cliconn.group("real")
             nuhr = f"{nickname}!{userhost} {realname}"
 
-            matched_trigger = await self._check_trigger(nuhr)
+            matched_trigger = await self._check_triggers(nuhr)
             if matched_trigger is not None:
                 trigger_id, trigger_action = matched_trigger
                 await self._log(f"TRIGGER:{trigger_action.name}: {trigger_id} {nuhr}")
@@ -165,7 +168,7 @@ class Server(BaseServer):
             # CTCP VERSION response
             version = p_version.group("version")
 
-            matched_reject = await self._check_reject(version)
+            matched_reject = await self._check_rejects(version)
             if matched_reject is not None:
                 # GET THEY ASS
                 _, reject = self._rejects[matched_reject]
@@ -255,7 +258,7 @@ class Server(BaseServer):
         if nuhr is None:
             return ["please provide `nickname!username@hostname realname`"]
 
-        matched_trigger = await self._check_trigger(sargs)
+        matched_trigger = await self._check_triggers(sargs)
         if matched_trigger is None:
             return ["no trigger matched"]
 
@@ -376,6 +379,7 @@ class Server(BaseServer):
             compile_pattern(pattern),
             await self._database.trigger.get(trigger_id),
         )
+        self._sort_triggers()
 
         return [f"added trigger {trigger_id}"]
 
@@ -404,7 +408,10 @@ class Server(BaseServer):
             return [f"trigger {trigger_id} is already {action_name}"]
 
         await self._database.trigger.set(trigger_id, action)
+
         trigger.action = action
+        self._sort_triggers()
+
         return [f"set triger {trigger_id} to {action_name}"]
 
     async def _cmd_trigger_get(self, caller: Caller, sargs: str) -> Sequence[str]:
