@@ -47,14 +47,16 @@ class TriggerTable(Table):
         pattern, source, oper, action, ts = row
         return Trigger(pattern, source, oper, TriggerAction(action), ts)
 
-    async def add(self, pattern: str, source: str, oper: str) -> int:
+    async def add(
+        self, pattern: str, source: str, oper: str, action: TriggerAction
+    ) -> int:
         query = """
             INSERT INTO trigger (pattern, source, oper, action, ts)
             VALUES ($1, $2, $3, $4, NOW()::TIMESTAMP)
             RETURNING id
         """
         async with self.pool.acquire() as conn:
-            return await conn.fetchval(query, pattern, source, oper, TriggerAction.SCAN)
+            return await conn.fetchval(query, pattern, source, oper, action)
 
     async def remove(self, trigger_id: int) -> None:
         query = """

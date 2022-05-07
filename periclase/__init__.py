@@ -266,6 +266,7 @@ class Server(BaseServer):
         if sargs.strip() == "":
             return ["please provide a reject pattern and reason"]
 
+        # this may through ValueError, but up-stack will handle it nicely
         p_delim, pattern, p_flags, reason = lex_pattern(sargs)
 
         if reason.strip() == "":
@@ -353,12 +354,21 @@ class Server(BaseServer):
         if (sargs := sargs.strip()) == "":
             return ["please provide a trigger pattern"]
 
-        p_delim, pattern, p_flags, _ = lex_pattern(sargs)
+        # this may through ValueError, but up-stack will handle it nicely
+        p_delim, pattern, p_flags, action_name = lex_pattern(sargs)
+
+        action_name, *_ = action_name.upper().split(" ", 1)
+        action_names = sorted([a.name for a in TriggerAction])
+        if not action_name in action_names:
+            action_names_s = ", ".join(action_names)
+            return [f"unknown action '{action_name}', expected {action_names_s}"]
+
+        action = TriggerAction[action_name]
 
         # TODO: kinda strange that we totally re-create the pattern
         pattern = f"{chr(p_delim)}{pattern}{chr(p_delim)}{p_flags}"
         trigger_id = await self._database.trigger.add(
-            pattern, caller.source, caller.oper
+            pattern, caller.source, caller.oper, action
         )
         self._triggers[trigger_id] = (
             compile_pattern(pattern),
