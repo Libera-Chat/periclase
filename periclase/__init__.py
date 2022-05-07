@@ -377,6 +377,33 @@ class Server(BaseServer):
 
         return [f"added trigger {trigger_id}"]
 
+    async def _cmd_trigger_set(self, caller: Caller, sargs: str) -> Sequence[str]:
+        trigger_id_s, _, action_name = sargs.partition(" ")
+        if not trigger_id_s:
+            return ["please provide a trigger id"]
+        elif not trigger_id_s.isdigit():
+            return [f"'{sargs}' is not a valid trigger id"]
+
+        trigger_id = int(trigger_id_s)
+        if not trigger_id in self._triggers:
+            return ["unknown trigger id"]
+
+        if (action_name := action_name.strip().upper()) == "":
+            return ["please provide a trigger action"]
+
+        action_names = sorted([a.name for a in TriggerAction])
+        if not action_name in action_names:
+            action_names_s = ", ".join(action_names)
+            return [f"unknown action '{action_name}', expected {action_names_s}"]
+
+        action = TriggerAction[action_name]
+        _, trigger = self._triggers[trigger_id]
+        if trigger.action == action:
+            return [f"trigger {trigger_id} is already {action_name}"]
+
+        await self._database.trigger.set(trigger_id, action)
+        return [f"set triger {trigger_id} to {action_name}"]
+
     async def _cmd_trigger_get(self, caller: Caller, sargs: str) -> Sequence[str]:
         if sargs.strip() == "":
             return ["please provide a trigger id"]
@@ -417,9 +444,14 @@ class Server(BaseServer):
         output: List[str] = []
 
         col_max = max(len(str(trigger_id)) for trigger_id in self._triggers.keys())
+        last_action: Optional[TriggerAction] = None
         for trigger_id, (_, trigger) in self._triggers.items():
+            if last_action is None or not trigger.action == last_action:
+                last_action = trigger.action
+                output.append(f"{trigger.action.name}:")
+
             trigger_id_s = str(trigger_id).rjust(col_max)
-            output.append(f"{trigger_id_s}: {trigger.pattern}")
+            output.append(f"  {trigger_id_s}: {trigger.pattern}")
 
         output.append(f"({len(output)} total)")
         return output
@@ -428,6 +460,7 @@ class Server(BaseServer):
     async def cmd_trigger(self, caller: Caller, sargs: str) -> Sequence[str]:
         subcmds: Dict[str, Callable[[Caller, str], Awaitable[Sequence[str]]]] = {
             "ADD": self._cmd_trigger_add,
+            "SET": self._cmd_trigger_set,
             "GET": self._cmd_trigger_get,
             "REMOVE": self._cmd_trigger_remove,
             "LIST": self._cmd_trigger_list,

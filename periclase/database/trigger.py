@@ -6,9 +6,10 @@ from .common import Table
 
 
 class TriggerAction(IntEnum):
-    IGNORE = 1
-    SCAN = 2
-    QUIETSCAN = 3
+    DISABLED = 1
+    IGNORE = 2
+    SCAN = 3
+    QUIETSCAN = 4
 
 
 @dataclass
@@ -41,6 +42,7 @@ class TriggerTable(Table):
             FROM trigger
             WHERE id = $1
         """
+
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(query, trigger_id)
 
@@ -55,13 +57,25 @@ class TriggerTable(Table):
             VALUES ($1, $2, $3, $4, NOW()::TIMESTAMP)
             RETURNING id
         """
+
         async with self.pool.acquire() as conn:
             return await conn.fetchval(query, pattern, source, oper, action)
+
+    async def set(self, trigger_id: int, action: TriggerAction) -> None:
+        query = """
+            UPDATE trigger
+            SET action = $2
+            WHERE id = $1
+        """
+
+        async with self.pool.acquire() as conn:
+            await conn.execute(query, trigger_id, action)
 
     async def remove(self, trigger_id: int) -> None:
         query = """
             DELETE FROM trigger
             WHERE id = $1
         """
+
         async with self.pool.acquire() as conn:
             await conn.fetchrow(query, trigger_id)
