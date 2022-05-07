@@ -402,6 +402,7 @@ class Server(BaseServer):
             return [f"trigger {trigger_id} is already {action_name}"]
 
         await self._database.trigger.set(trigger_id, action)
+        trigger.action = action
         return [f"set triger {trigger_id} to {action_name}"]
 
     async def _cmd_trigger_get(self, caller: Caller, sargs: str) -> Sequence[str]:
@@ -453,7 +454,7 @@ class Server(BaseServer):
             trigger_id_s = str(trigger_id).rjust(col_max)
             output.append(f"  {trigger_id_s}: {trigger.pattern}")
 
-        output.append(f"({len(output)} total)")
+        output.append(f"({len(self._triggers)} total)")
         return output
 
     # TODO: this is a lot of code duplication. what can we do about that?
