@@ -8,8 +8,8 @@ from .common import Table
 class TriggerAction(IntEnum):
     DISABLED = 1
     IGNORE = 2
-    SCAN = 3
-    QUIETSCAN = 4
+    QUIETSCAN = 3
+    SCAN = 4
 
 
 @dataclass
