@@ -31,7 +31,7 @@ the argument given to this is a `/regex/` that is run against `nickname!username
 <jess> trigger add /^jess-test-2!/ scan
 -libera-connect- added trigger 2
 <jess> trigger add /^jess-test-2!/ floob
--libera-connect- unknown action 'FLOOB', expected IGNORE, QUIETSCAN, SCAN
+-libera-connect- unknown action 'FLOOB', expected DISABLED, IGNORE, QUIETSCAN, SCAN
 ```
 
 ### trigger set
