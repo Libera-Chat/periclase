@@ -4,7 +4,7 @@
 -- 50  is realname length
 -- 64  is hostname length
 -- 92  is mask length
--- 260 is reason length
+-- 390 is reason length
 
 BEGIN;
 
@@ -21,7 +21,7 @@ CREATE TABLE reject (
     pattern  TEXT          NOT NULL,
     oper     VARCHAR(16)   NOT NULL,
     source   VARCHAR(92)   NOT NULL,
-    reason   VARCHAR(260)  NOT NULL,
+    reason   VARCHAR(390)  NOT NULL,
     ts       TIMESTAMP     NOT NULL
 );
 
