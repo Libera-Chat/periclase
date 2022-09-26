@@ -1,4 +1,4 @@
-# pericase - CTCP scanner and banner
+# periclase - CTCP scanner and banner
 
 The main instance of periclase running on Libera Chat uses the nickname `libera-connect` to be more evidently an official piece of the network.
 
