@@ -31,12 +31,19 @@ def lex_pattern(pattern: str) -> Tuple[int, str, str, str]:
 
 
 def compile_pattern(pattern: str) -> Pattern:
-    _1, regex, pattern_flags, _2 = lex_pattern(pattern)
+    pattern_delim, regex, pattern_flags, _2 = lex_pattern(pattern)
+
+    if pattern_delim in {ord("'"), ord('"')}:
+        regex = re.escape(regex)
 
     regex_flags = 0
     for pattern_flag in pattern_flags:
         if pattern_flag == "i":
             regex_flags |= re.I
+        elif pattern_flag == "^":
+            regex = f"^{regex}"
+        elif pattern_flag == "$":
+            regex = f"{regex}$"
         else:
             raise ValueError(f"unknown pattern flag '{pattern_flag}'")
 
