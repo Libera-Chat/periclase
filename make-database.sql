@@ -21,6 +21,7 @@ CREATE TABLE reject (
     pattern  TEXT          NOT NULL,
     oper     VARCHAR(16)   NOT NULL,
     source   VARCHAR(92)   NOT NULL,
+    action   SMALLINT      NOT NULL,
     reason   VARCHAR(390)  NOT NULL,
     ts       TIMESTAMP     NOT NULL
 );

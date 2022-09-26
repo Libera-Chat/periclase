@@ -21,7 +21,7 @@ from ircchallenge import Challenge
 
 from .config import Config
 from .database import Database
-from .database.reject import Reject
+from .database.reject import Action, Reject
 from .database.trigger import Trigger, TriggerAction
 from .utils import compile_pattern, lex_pattern
 
@@ -175,7 +175,12 @@ class Server(BaseServer):
                 await self._log(
                     f"BAD: {matched_reject} {line.hostmask.nickname} {version}"
                 )
-                await self.send(build("KLINE", ["10", f"*@{ip}", reject.reason]))
+                if reject.action == Action.BAN:
+                    await self.send(build("KLINE", ["10", f"*@{ip}", reject.reason]))
+                else:
+                    await self.send(
+                        build("NOTICE", [line.hostmask.nickname, reject.reason])
+                    )
             else:
                 await self._log(f"FINE: {line.hostmask.nickname} {version}")
 
@@ -280,7 +285,7 @@ class Server(BaseServer):
         # TODO: kinda strange that we totally re-create the pattern
         pattern = f"{chr(p_delim)}{pattern}{chr(p_delim)}{p_flags}"
         reject_id = await self._database.reject.add(
-            pattern, caller.source, caller.oper, reason
+            pattern, caller.source, caller.oper, Action.BAN, reason
         )
         self._rejects[reject_id] = (
             compile_pattern(pattern),
